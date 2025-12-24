@@ -20,9 +20,9 @@ def test_transcribe():
     print("Loading processor...")
     processor = VoxtralProcessor.from_pretrained(model_id)
 
-    print("Processing audio with apply_transcrition_request...")
+    print("Processing audio with apply_transcription_request...")
 
-    inputs = processor.apply_transcrition_request(
+    inputs = processor.apply_transcription_request(
         language="en", audio=audio_url
     )
 

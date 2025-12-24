@@ -32,7 +32,7 @@ def main():
     audio_url = "https://huggingface.co/datasets/hf-internal-testing/dummy-audio-samples/resolve/main/obama.mp3"
     
     print("\nProcessing audio...")
-    inputs = processor.apply_transcrition_request(
+    inputs = processor.apply_transcription_request(
         language="en", 
         audio=audio_url
     )

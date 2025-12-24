@@ -95,9 +95,9 @@ class VoxtralProcessor:
                     encoding["attention_mask"] = text_encoding["attention_mask"]
             else:
                 token_ids = self.tokenizer.encode(text)
-                if len(token_ids) > 0 and token_ids[-1] == 2:  # 2 is EOS
+                if len(token_ids) > 0 and token_ids[-1] == self._special_token_ids['eos']:
                     token_ids = token_ids[:-1]
-                if len(token_ids) > 1 and token_ids[0] == 1 and token_ids[1] == 1:
+                if len(token_ids) > 1 and token_ids[0] == self._special_token_ids['bos'] and token_ids[1] == self._special_token_ids['bos']:
                     token_ids = token_ids[1:]
 
                 encoding["input_ids"] = mx.array([token_ids])
@@ -201,7 +201,7 @@ class VoxtralProcessor:
             tokenizer=tokenizer,
         )
 
-    def apply_transcrition_request(
+    def apply_transcription_request(
         self,
         audio: Union[str, np.ndarray, List[float]],
         language: Optional[str] = None,
@@ -235,7 +235,7 @@ class VoxtralProcessor:
         # The format is: <s>[INST][BEGIN_AUDIO][AUDIO tokens][/INST]lang:{language}[TRANSCRIBE]
         
         if self._special_token_ids is None:
-            raise ValueError("Tokenizer is required for apply_transcrition_request")
+            raise ValueError("Tokenizer is required for apply_transcription_request")
 
         # Start with BOS token
         tokens = [self._special_token_ids['bos']]

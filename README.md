@@ -45,7 +45,7 @@ model = VoxtralForConditionalGeneration.from_pretrained("mistralai/Voxtral-Mini-
 processor = VoxtralProcessor.from_pretrained("mistralai/Voxtral-Mini-3B-2507")
 
 # Transcribe audio
-inputs = processor.apply_transcrition_request(
+inputs = processor.apply_transcription_request(
     language="en",
     audio="speech.mp3"
 )
@@ -137,7 +137,7 @@ for chunk in model.transcribe_stream("podcast.mp3", processor, chunk_length_s=30
 ### Custom Generation Parameters
 
 ```python
-inputs = processor.apply_transcrition_request(
+inputs = processor.apply_transcription_request(
     language="en",
     audio="speech.mp3"
 )
@@ -159,7 +159,7 @@ audio_files = ["audio1.mp3", "audio2.mp3", "audio3.mp3"]
 transcriptions = []
 
 for audio_file in audio_files:
-    inputs = processor.apply_transcrition_request(language="en", audio=audio_file)
+    inputs = processor.apply_transcription_request(language="en", audio=audio_file)
     outputs = model.generate(**inputs, max_new_tokens=1024)
     text = processor.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
     transcriptions.append(text)
@@ -186,7 +186,7 @@ models = {
 processor = VoxtralProcessor.from_pretrained("mistralai/Voxtral-Mini-3B-2507")
 
 # Apply transcription formatting
-inputs = processor.apply_transcrition_request(
+inputs = processor.apply_transcription_request(
     language="en",  # or "fr", "de", etc.
     audio="path/to/audio.mp3",
     task="transcribe",  # or "translate"

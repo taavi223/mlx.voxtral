@@ -121,7 +121,7 @@ Examples:
     if args.verbose:
         print(f"\nProcessing audio: {args.audio}")
     
-    inputs = processor.apply_transcrition_request(audio=args.audio, language=args.language)
+    inputs = processor.apply_transcription_request(audio=args.audio, language=args.language)
     
     mlx_inputs = {
         "input_ids": inputs.input_ids,
