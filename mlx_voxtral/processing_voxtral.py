@@ -292,47 +292,13 @@ class VoxtralProcessor:
 
         return TranscriptionInputs(input_ids, input_features)
     
-    def _parse_message_content(
-        self, content: Union[str, List[Dict[str, Any]]]
-    ) -> Tuple[List[Dict[str, Any]], List[Union[str, np.ndarray]]]:
-        """Parse message content into structured format and extract audio data.
-        
-        Returns:
-            content_items: List of content items with type and data
-            audio_data: List of audio data (paths, arrays, etc.)
-        """
-        if isinstance(content, str):
-            return [{"type": "text", "text": content}], []
-        
-        content_items = []
-        audio_data = []
-        
-        for item in content:
-            if item["type"] == "text":
-                content_items.append(item)
-            elif item["type"] == "audio":
-                content_items.append(item)
-                if "audio" in item:
-                    audio_data.append(item["audio"])
-                elif "path" in item:
-                    audio_data.append(item["path"])
-                elif "url" in item:
-                    audio_data.append(item["url"])
-                elif "base64" in item:
-                    audio_data.append(item["base64"])
-                else:
-                    raise ValueError("Audio content must have 'audio', 'path', 'url', or 'base64' field")
-            else:
-                raise ValueError(f"Unknown content type: {item['type']}")
-        
-        return content_items, audio_data
-    
     def apply_chat_template(
         self,
         conversation: Union[List[Dict[str, Any]], Dict[str, Any]],
         tokenize: bool = True,
-        add_generation_prompt: bool = False,
+        continue_final_message: bool = True,
         return_tensors: Optional[str] = None,
+        sampling_rate: Optional[int] = None,
         **kwargs,
     ) -> Union[str, Dict[str, mx.array]]:
         """Apply chat template to format conversation messages.
@@ -340,7 +306,6 @@ class VoxtralProcessor:
         Args:
             conversation: Single message dict or list of message dicts with 'role' and 'content'
             tokenize: If True, return tokenized output; if False, return formatted string
-            add_generation_prompt: If True, add prompt for assistant response
             return_tensors: "mlx" for MLX arrays, None for lists
             
         Returns:
@@ -359,25 +324,20 @@ class VoxtralProcessor:
         all_audio_features = []
         
         all_tokens.append(self._special_token_ids['bos'])
-        
+
+        last_role = None
         for i, message in enumerate(conversation):
             role = message["role"]
-            content = message["content"]
-            
-            content_items, audio_data = self._parse_message_content(content)
-            
-            if role == "system":
-                # System message format: system\n{content}</s>
-                all_tokens.extend(self.tokenizer.encode("system\n", add_special_tokens=False))
-                
-                for item in content_items:
-                    if item["type"] == "text":
-                        text_tokens = self.tokenizer.encode(item["text"], add_special_tokens=False)
-                        all_tokens.extend(text_tokens)
-                
-                all_tokens.append(self._special_token_ids['eos'])
-                
-            elif role == "user":
+            content_items = message["content"]
+
+            if isinstance(content_items, str):
+                content_items = [{"type": "text", "text": content_items}]
+
+            if role == last_role:
+                raise ValueError(f"Consecutive {role} messages are not allowed")
+            last_role = role
+
+            if role == "user":
                 # User message format: [INST]{content}[/INST]
                 all_tokens.append(self._special_token_ids['inst'])
                 
@@ -386,8 +346,6 @@ class VoxtralProcessor:
                         text_tokens = self.tokenizer.encode(item["text"], add_special_tokens=False)
                         all_tokens.extend(text_tokens)
                     elif item["type"] == "audio":
-                        audio_idx = len(all_audio_features)
-                        
                         if "audio" in item:
                             audio_input = item["audio"]
                         elif "path" in item:
@@ -396,12 +354,12 @@ class VoxtralProcessor:
                             audio_input = item["url"]
                         elif "base64" in item:
                             raise NotImplementedError("Base64 audio not yet supported")
-                        
-                        sampling_rate = item.get("sampling_rate", None)
+                        else:
+                            raise ValueError("Audio content must have 'audio', 'path', 'url', or 'base64' field")
                         
                         audio_features = self.feature_extractor(
                             audio_input,
-                            sampling_rate=sampling_rate,
+                            sampling_rate=item.get("sampling_rate", sampling_rate if sampling_rate else 16000),
                             return_tensors="mlx",
                         )
                         
@@ -416,22 +374,24 @@ class VoxtralProcessor:
                         num_chunks = features.shape[0]
                         num_audio_tokens = num_chunks * 375
                         all_tokens.extend([self._special_token_ids['audio']] * num_audio_tokens)
+                    else:
+                        raise ValueError(f"Unknown content type in user message: {item['type']}")
                 
                 all_tokens.append(self._special_token_ids['inst_end'])
-                
-                if i == len(conversation) - 1 and len(content_items) == 1 and content_items[0]["type"] == "audio":
-                    lang_str = "lang:en"  # Default to English
-                    lang_tokens = self.tokenizer.encode(lang_str, add_special_tokens=False)
-                    all_tokens.extend(lang_tokens)
-                    all_tokens.append(self._special_token_ids['transcribe'])
-                
+                                
             elif role == "assistant":
+                # Assistant message format: {content}[/EOS]
                 for item in content_items:
                     if item["type"] == "text":
                         text_tokens = self.tokenizer.encode(item["text"], add_special_tokens=False)
                         all_tokens.extend(text_tokens)
+                    else:
+                        raise ValueError(f"Unknown content type in assistant message: {item['type']}")
                 
-                if not (i == len(conversation) - 1 and add_generation_prompt):
+                if i == len(conversation) - 1:
+                    if not continue_final_message:
+                        raise ValueError("Final assistant message without continue_final_message flag.")
+                else:
                     all_tokens.append(self._special_token_ids['eos'])
             
             else:
