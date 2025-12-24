@@ -296,7 +296,7 @@ class VoxtralProcessor:
         self,
         conversation: Union[List[Dict[str, Any]], Dict[str, Any]],
         tokenize: bool = True,
-        continue_final_message: bool = True,
+        continue_final_message: bool = False,
         return_tensors: Optional[str] = None,
         sampling_rate: Optional[int] = None,
         **kwargs,
